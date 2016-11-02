@@ -8,14 +8,59 @@ const WebpackDevServer = require('webpack-dev-server');
 const ProgressPlugin = require('webpack/lib/ProgressPlugin');
 import { webpackDevServerOutputOptions } from '../models/';
 import { NgCliWebpackConfig } from '../models/webpack-config';
+import { webpackOutputOptions } from '../models/';
 import { ServeTaskOptions } from '../commands/serve';
 import { CliConfig } from '../models/config';
 import { oneLine } from 'common-tags';
 import * as url from 'url';
 const opn = require('opn');
 
+const tempDir = 'tmp';
+
 export default Task.extend({
-  run: function(commandOptions: ServeTaskOptions) {
+  run(commandOptions: ServeTaskOptions) {
+    return Promise.resolve()
+      .then(() => commandOptions.dll ? this.buildDll(commandOptions) : true)
+      .then(() => this.startServe(commandOptions));
+  },
+
+  buildDll(commandOptions: ServeTaskOptions) {
+    // TODO: create temp folder or temp filesystem?
+
+    const dllConfig = new NgCliWebpackConfig(
+      this.project,
+      commandOptions.target,
+      commandOptions.environment,
+      'tmp',
+      undefined,
+      commandOptions.aot,
+      true
+    ).config;
+
+    // fail on build error
+    dllConfig.bail = true;
+
+    const dllCompiler: any = webpack(dllConfig);
+
+    dllCompiler.apply(new ProgressPlugin({
+      profile: true,
+      colors: true
+    }));
+
+    return new Promise((resolve, reject) => {
+      dllCompiler.run((err: any, stats: any) => {
+        if (err) {
+          console.error(err.details || err);
+          reject(err.details || err);
+        }
+
+        process.stdout.write(stats.toString(webpackOutputOptions) + '\n');
+        resolve();
+      });
+    });
+  },
+
+  startServe(commandOptions: ServeTaskOptions) {
     const ui = this.ui;
 
     let webpackCompiler: any;
@@ -24,9 +69,11 @@ export default Task.extend({
       this.project,
       commandOptions.target,
       commandOptions.environment,
+      tempDir,
       undefined,
-      undefined,
-      commandOptions.aot
+      commandOptions.aot,
+      false,
+      commandOptions.dll
     ).config;
 
     // This allows for live reload of page when changes are made to repo.

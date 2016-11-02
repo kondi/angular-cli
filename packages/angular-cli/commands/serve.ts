@@ -27,6 +27,7 @@ export interface ServeTaskOptions {
   sslCert?: string;
   aot?: boolean;
   open?: boolean;
+  dll?: boolean;
 }
 
 const ServeCommand = Command.extend({
@@ -81,6 +82,7 @@ const ServeCommand = Command.extend({
     { name: 'ssl-key',              type: String,  default: 'ssl/server.key' },
     { name: 'ssl-cert',             type: String,  default: 'ssl/server.crt' },
     { name: 'aot',                  type: Boolean, default: false },
+    { name: 'dll',                  type: Boolean, default: false },
     {
       name: 'open',
       type: Boolean,

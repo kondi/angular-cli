@@ -11,12 +11,56 @@ import { CliConfig } from '../models/config';
 let lastHash: any = null;
 
 export default Task.extend({
-  run: function(runTaskOptions: BuildOptions) {
-
+  run(runTaskOptions: BuildOptions) {
     const project = this.cliProject;
 
-    const outputDir = runTaskOptions.outputPath || CliConfig.fromProject().config.apps[0].outDir;
+    const cliConfig = CliConfig.fromProject();
+    const appConfig = cliConfig.config.apps[0];
+    const outputDir = runTaskOptions.outputPath || appConfig.outDir;
     rimraf.sync(path.resolve(project.root, outputDir));
+
+    return Promise.resolve()
+      .then(() => runTaskOptions.dll ? this.buildDll(runTaskOptions, outputDir) : true)
+      .then(() => this.startWatch(runTaskOptions, outputDir));
+  },
+
+  buildDll(runTaskOptions: BuildOptions, outputDir: string) {
+    const project = this.cliProject;
+
+    const dllConfig = new NgCliWebpackConfig(
+      project,
+      runTaskOptions.target,
+      runTaskOptions.environment,
+      outputDir,
+      runTaskOptions.baseHref,
+      runTaskOptions.aot,
+      true
+    ).config;
+
+    // fail on build error
+    dllConfig.bail = true;
+
+    const dllCompiler: any = webpack(dllConfig);
+
+    dllCompiler.apply(new ProgressPlugin({
+      profile: true
+    }));
+
+    return new Promise((resolve, reject) => {
+      dllCompiler.run((err: any, stats: any) => {
+        if (err) {
+          console.error(err.details || err);
+          reject(err.details || err);
+        }
+
+        process.stdout.write(stats.toString(webpackOutputOptions) + '\n');
+        resolve();
+      });
+    });
+  },
+
+  startWatch(runTaskOptions: BuildOptions, outputDir: string) {
+    const project = this.cliProject;
 
     const config = new NgCliWebpackConfig(
       project,
@@ -24,7 +68,9 @@ export default Task.extend({
       runTaskOptions.environment,
       outputDir,
       runTaskOptions.baseHref,
-      runTaskOptions.aot
+      runTaskOptions.aot,
+      false,
+      runTaskOptions.dll
     ).config;
     const webpackCompiler: any = webpack(config);
 
