@@ -66,18 +66,26 @@ export class NgCliWebpackConfig {
     );
 
     if (isDllLib) {
-      const dll = [
-        '@angular/common',
-        '@angular/compiler',
-        '@angular/core',
-        '@angular/forms',
-        '@angular/http',
-        '@angular/platform-browser',
-        '@angular/platform-browser-dynamic',
-        '@angular/router'
-      ];
+      const dll: string[] = [];
       const appRoot = path.resolve(this.ngCliProject.root, appConfig.root);
-      dll.push(path.resolve(appRoot, 'polyfills'));
+
+      try {
+        const dllPath = path.resolve(appRoot, 'dll');
+        require.resolve(dllPath);
+        dll.push(dllPath);
+      } catch (e) {
+        dll.push(
+          '@angular/common',
+          '@angular/compiler',
+          '@angular/core',
+          '@angular/forms',
+          '@angular/http',
+          '@angular/platform-browser',
+          '@angular/platform-browser-dynamic',
+          '@angular/router'
+        );
+        dll.push(path.resolve(appRoot, 'polyfills'));
+      }
 
       this.config.entry = { dll };
       this.config.output.library = 'angular_cli_[name]_lib';
